@@ -2,8 +2,13 @@
 Downloader für Berichte von [JW Management](https://www.jwmanagement.org/)
 
 ## Verwendung
+*Windows*
 ```bash
-./venv/Scripts/activate
+venv\Source\activate
+```
+*bash*
+```bash
+source ./venv/bin/activate
 ```
 Dann:
 ```bash
