@@ -55,6 +55,7 @@ def usage():
     print("--start-date or -s  Start date (<Year>M<Month>, e.g. 2019M03 for March 2019)")
     print("--end-date or -e    End date (<Year>M<Month>, e.g. 2019M03 for March 2019)")
     print("--directory or -d   Directory for reports-files")
+    print("")
     print("--help or -h        This message")
 
 

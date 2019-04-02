@@ -1,11 +1,11 @@
 ﻿@ECHO OFF
 
-REM Hier für WORKDIR das korrekte Verzeichnis angeben...
-SET WORKDIR="C:\...\jwmReportDownloader"
+REM Hier für WORKPATH das korrekte Verzeichnis angeben...
+SET WORKPATH="C:\...\jwmReportDownloader"
 
-CALL %WORKDIR%\venv\Scripts\activate.bat
+CALL %WORKPATH%\venv\Scripts\activate.bat
 
 REM Hier die gewünschten Parameter anfügen...
-python %WORKDIR%\jwmReportDownloader.py
+python %WORKPATH%\jwmReportDownloader.py
 
 deactivate
