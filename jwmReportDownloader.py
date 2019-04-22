@@ -26,12 +26,13 @@ import getopt
 import sys
 import time
 import os
+import logging
 
 
-def download_wait(path):
+def download_wait(path, max_wait_duration=20):
     seconds = 0
     wait_download = True
-    while wait_download and seconds < 20:
+    while wait_download and seconds < max_wait_duration:
         time.sleep(1)
         wait_download = False
         for file_name in os.listdir(path):
@@ -55,11 +56,24 @@ def usage():
     print("--start-date or -s  Start date (<Year>M<Month>, e.g. 2019M03 for March 2019)")
     print("--end-date or -e    End date (<Year>M<Month>, e.g. 2019M03 for March 2019)")
     print("--directory or -d   Directory for reports-files")
+    print("--wait or -w        Wait duration for file downloads in seconds")
     print("")
     print("--help or -h        This message")
 
 
 def main():
+    logger = logging.getLogger('jwmReportDownloader')
+    logger.setLevel(logging.INFO)
+    fh = logging.FileHandler('jwmReportDownloader.log')
+    fh.setLevel(logging.INFO)
+    sh = logging.StreamHandler()
+    sh.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    fh.setFormatter(formatter)
+    sh.setFormatter(formatter)
+    logger.addHandler(fh)
+    logger.addHandler(sh)
+
     try:
         opts, args = getopt.getopt(sys.argv[1:], "hu:p:r:s:e:d:", ["help", "user=", "password=", "project=",
                                                                    "start-date=", "end-date=", "directory="])
@@ -79,6 +93,7 @@ def main():
     start_year = None
     end_month = None
     end_year = None
+    wait_duration = 20
 
     for o, a in opts:
         if o in ("-u", "--user"):
@@ -87,6 +102,8 @@ def main():
             password = a
         elif o in ("-r", "--project"):
             project = a
+        elif o in ("-w", "--wait"):
+            wait_duration = a
         elif o in ("-s", "--start-date"):
             if 'M' not in a:
                 sys.exit(2)
@@ -108,7 +125,7 @@ def main():
             assert False, "unhandled option %s" % o
 
     start_date, end_date = get_dates(start_month, start_year, end_month, end_year)
-
+    logger.info('Fetching files from %s to %s from project %s' % (start_date, end_date, project))
     options = Options()
     options.add_experimental_option("prefs", {
         "download.default_directory": directory,
@@ -117,23 +134,30 @@ def main():
         "safebrowsing.enabled": True
     })
 
-    browser = webdriver.Chrome(options=options)
+    logger.info('Trying to log in...')
+    try:
+        browser = webdriver.Chrome(options=options)
 
-    browser.get('https://www.jwmanagement.org/en/signin')
+        browser.get('https://www.jwmanagement.org/en/signin')
 
-    elem = browser.find_element_by_name('usernameOrEmail')  # Find the search box
-    elem.send_keys(user)
-    elem = browser.find_element_by_name('password')  # Find the search box
-    elem.send_keys(password)
-    elem = browser.find_element_by_tag_name('button')
-    elem.click()
+        elem = browser.find_element_by_name('usernameOrEmail')  # Find the search box
+        elem.send_keys(user)
+        elem = browser.find_element_by_name('password')  # Find the search box
+        elem.send_keys(password)
+        elem = browser.find_element_by_tag_name('button')
+        elem.click()
 
-    WebDriverWait(browser, 10).until(ec.visibility_of_element_located((By.CLASS_NAME, "navbar")))
+        WebDriverWait(browser, 10).until(ec.visibility_of_element_located((By.CLASS_NAME, "navbar")))
+    except BaseException as e:
+        logger.error('Login unsuccessful')
+        logger.exception(e)
+        sys.exit(2)
 
+    logger.info('Login successful')
     old_file = Path(r'%s\reports.csv')
     if old_file.exists() and old_file.is_file():
         os.remove(r'%s\reports.csv')
-    get_reports(browser, directory, project, start_date, end_date)
+    get_reports(browser, directory, project, start_date, end_date, wait_duration)
 
     browser.quit()
 
@@ -167,23 +191,31 @@ def check_date(month, year):
     return True
 
 
-def get_reports(browser, directory, project, start_date, end_date):
+def get_reports(browser, directory, project, start_date, end_date, wait_duration):
+    logger = logging.getLogger('jwmReportDownloader')
     current_date = start_date
     while current_date <= end_date:
-        browser.get('https://www.jwmanagement.org/%s/reports?month=%dM%d' % (project, current_date.year,
-                                                                             current_date.month))
-        WebDriverWait(browser, 10).until(ec.visibility_of_element_located((By.ID, "exportReports")))
-        WebDriverWait(browser, 10).until(ec.invisibility_of_element((By.CLASS_NAME, "fa-spinner")))
-        elem = browser.find_element_by_id("exportReports")
-        elem.click()
-        download_wait(directory)
-        new_file_name = r'%s\%s_%d_%02d.csv' % (directory, datetime.now().strftime("%Y%m%d"),
-                                                current_date.year, current_date.month)
-        old_file = Path(new_file_name)
-        if old_file.exists() and old_file.is_file():
-            os.remove(new_file_name)
-        os.rename(r'%s\reports.csv' % directory, new_file_name)
+        file = 'https://www.jwmanagement.org/%s/reports?month=%dM%d' % (project, current_date.year, current_date.month)
+        logger.info('Downloading from %s' % file)
+        try:
+            browser.get(file)
+            WebDriverWait(browser, 10).until(ec.visibility_of_element_located((By.ID, "exportReports")))
+            WebDriverWait(browser, 10).until(ec.invisibility_of_element((By.CLASS_NAME, "fa-spinner")))
+            elem = browser.find_element_by_id("exportReports")
+            elem.click()
+            download_wait(directory, wait_duration)
+            new_file_name = r'%s\%s_%d_%02d.csv' % (directory, datetime.now().strftime("%Y%m%d"),
+                                                    current_date.year, current_date.month)
+            old_file = Path(new_file_name)
+            if old_file.exists() and old_file.is_file():
+                os.remove(new_file_name)
+            os.rename(r'%s\reports.csv' % directory, new_file_name)
+            logger.info('%s finished' % file)
+        except BaseException as e:
+            logger.error('Error downloading form %s' % file)
+            logger.exception(e)
         current_date = current_date + relativedelta(months=+1)
+    logger.info('All downloads finished')
 
 
 if __name__ == '__main__':
