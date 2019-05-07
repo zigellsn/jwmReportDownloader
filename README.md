@@ -1,6 +1,9 @@
 ﻿# jwmReportDownloader
 Downloader für Berichte von [JW Management](https://www.jwmanagement.org/)
 
+## Installation
+[INSTALL.md](https://github.com/zigellsn/jwmReportDownloader/blob/master/INSTALL.md)
+
 ## Verwendung
 *Windows*
 ```bash
@@ -25,6 +28,7 @@ python jwmReportDownloader.py --parameter_aus_liste_von_unten...
 | `--start-date` oder `-s` | kann | Startdatum (siehe *Datumsangaben*)                                                             |
 | `--end-date` oder `-e`   | kann | Enddatum (siehe *Datumsangaben*)                                                               |
 | `--wait` oder `-w`       | kann | Wartezeit bis Downloadabschluss in Sekunden. Standard = 20 Sekunden                            |
+| `--headless` oder `-l`   | kann | Browser im Headless-Modus (unsichtbar) ausführen                                               |
 | `--directory` oder `-d`  | kann | Downloadverzeichnis (ohne abschließenden Schrägstrich) - Standard ist das aktuelle Verzeichnis |
 
 ### Datumsangaben

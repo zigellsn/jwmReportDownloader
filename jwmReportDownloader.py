@@ -56,6 +56,7 @@ def usage():
     print("--start-date or -s  Start date (<Year>M<Month>, e.g. 2019M03 for March 2019)")
     print("--end-date or -e    End date (<Year>M<Month>, e.g. 2019M03 for March 2019)")
     print("--directory or -d   Directory for reports-files")
+    print("--headless or -l    Headless execution")
     print("--wait or -w        Wait duration for file downloads in seconds")
     print("")
     print("--help or -h        This message")
@@ -75,8 +76,9 @@ def main():
     logger.addHandler(sh)
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "hu:p:r:s:e:d:", ["help", "user=", "password=", "project=",
-                                                                   "start-date=", "end-date=", "directory="])
+        opts, args = getopt.getopt(sys.argv[1:], "hu:p:r:s:e:d:w:l", ["help", "user=", "password=", "project=",
+                                                                      "start-date=", "end-date=", "directory=", "wait=",
+                                                                      "headless"])
     except getopt.GetoptError as err:
         # print help information and exit:
         print(err)  # will print something like "option -a not recognized"
@@ -94,6 +96,7 @@ def main():
     end_month = None
     end_year = None
     wait_duration = 20
+    headless = False
 
     for o, a in opts:
         if o in ("-u", "--user"):
@@ -121,6 +124,8 @@ def main():
         elif o in ("-h", "--help"):
             usage()
             sys.exit()
+        elif o in ("-l", "--headless"):
+            headless = True
         else:
             assert False, "unhandled option %s" % o
 
@@ -133,11 +138,14 @@ def main():
         "download.directory_upgrade": True,
         "safebrowsing.enabled": True
     })
+    if headless:
+        options.add_argument("--headless")
 
     logger.info('Trying to log in...')
     try:
         browser = webdriver.Chrome(options=options)
-
+        if headless:
+            enable_download_in_headless_chrome(browser, directory)
         browser.get('https://www.jwmanagement.org/en/signin')
 
         elem = browser.find_element_by_name('usernameOrEmail')  # Find the search box
@@ -147,7 +155,7 @@ def main():
         elem = browser.find_element_by_tag_name('button')
         elem.click()
 
-        WebDriverWait(browser, 10).until(ec.visibility_of_element_located((By.CLASS_NAME, "navbar")))
+        WebDriverWait(browser, wait_duration).until(ec.visibility_of_element_located((By.CLASS_NAME, "navbar")))
     except BaseException as e:
         logger.error('Login unsuccessful')
         logger.exception(e)
@@ -159,7 +167,12 @@ def main():
         os.remove(r'%s\reports.csv')
     get_reports(browser, directory, project, start_date, end_date, wait_duration)
 
-    browser.quit()
+    try:
+        browser.quit()
+    except BaseException as e:
+        logger.error('Logout unsuccessful')
+        logger.exception(e)
+        sys.exit(2)
 
 
 def get_dates(start_month, start_year, end_month, end_year):
@@ -199,8 +212,8 @@ def get_reports(browser, directory, project, start_date, end_date, wait_duration
         logger.info('Downloading from %s' % file)
         try:
             browser.get(file)
-            WebDriverWait(browser, 10).until(ec.visibility_of_element_located((By.ID, "exportReports")))
-            WebDriverWait(browser, 10).until(ec.invisibility_of_element((By.CLASS_NAME, "fa-spinner")))
+            WebDriverWait(browser, wait_duration).until(ec.visibility_of_element_located((By.ID, "exportReports")))
+            WebDriverWait(browser, wait_duration).until(ec.invisibility_of_element((By.CLASS_NAME, "fa-spinner")))
             elem = browser.find_element_by_id("exportReports")
             elem.click()
             download_wait(directory, wait_duration)
@@ -209,13 +222,24 @@ def get_reports(browser, directory, project, start_date, end_date, wait_duration
             old_file = Path(new_file_name)
             if old_file.exists() and old_file.is_file():
                 os.remove(new_file_name)
-            os.rename(r'%s\reports.csv' % directory, new_file_name)
-            logger.info('%s finished' % file)
+            if Path(r'%s\reports.csv' % directory).exists():
+                os.rename(r'%s\reports.csv' % directory, new_file_name)
+                logger.info('%s finished' % file)
+            else:
+                logger.info('Error downloading form %s' % file)
         except BaseException as e:
             logger.error('Error downloading form %s' % file)
             logger.exception(e)
         current_date = current_date + relativedelta(months=+1)
     logger.info('All downloads finished')
+
+
+def enable_download_in_headless_chrome(browser, download_dir):
+    # add missing support for chrome "send_command"  to selenium webdriver
+    browser.command_executor._commands["send_command"] = ("POST", '/session/$sessionId/chromium/send_command')
+
+    params = {'cmd': 'Page.setDownloadBehavior', 'params': {'behavior': 'allow', 'downloadPath': download_dir}}
+    browser.execute("send_command", params)
 
 
 if __name__ == '__main__':

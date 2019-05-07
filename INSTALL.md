@@ -3,7 +3,8 @@
 ## Voraussetzungen
 - [Python 3](https://www.python.org/)
 - [Google Chrome](https://www.google.de/chrome/)
-- [ChromeDriver](http://chromedriver.chromium.org/) muss vorhanden sein und in einem Verzeichnis liegen, das in der PATH-Umgebungsvariablen eingetragen ist.
+- [ChromeDriver](http://chromedriver.chromium.org/) muss vorhanden sein und in einem Verzeichnis liegen, das in der PATH-Umgebungsvariablen eingetragen ist. 
+Die Version des ChromeDrivers muss der Version von Google Chrome entsprechen.
 
 ## Installation
 [Dieses Repository](https://github.com/zigellsn/jwmReportDownloader/archive/master.zip) herunterladen und entpacken. In das entpackte Verzeichnis mit dem Python-Skript wechseln. Dann:
